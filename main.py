@@ -6,6 +6,7 @@ import time
 import csv
 import sys
 import getopt
+# import pandas as pd
 
 # generate random integer values
 from random import seed
@@ -27,6 +28,7 @@ seed(1)
 
 FILENAME_JSTREE_URLS = "js_tree_urls_output.tsv"
 FILENAME_CHILDREN_URLS = "children_urls_output.tsv"
+FILENAME_TREES_CONTENTS_TSV = "trees_contents.tsv"
 
 def request(session, url, identifyingVal):
     # URL for API request to obtain the metadata based upon a study.
@@ -85,15 +87,63 @@ async def start_async_process():
                     buildTermApiUrlsArrays(inputJson, jsTreeUrlsArray, childrenUrlsArray, tsv_writer_j, tsv_writer_c)
                 pass
 
+async def start_async_process_tree_contents(urlsArray, funcExtractTextArrFromJson, treeTextContentsArr):
+    urlsArray = urlsArray[0:5]
+    # treeTextContentsArr = []
+    with ThreadPoolExecutor(max_workers=100) as executor:
+        with requests.Session() as session:
+            # asynchronously make an api call for each study
+            loop = asyncio.get_event_loop()
+            START_TIME = default_timer()
+            tasks = [
+                loop.run_in_executor(
+                    executor,
+                    request,
+                    *(session, url[0], url[0])
+                )
+                for url in urlsArray
+            ]
+
+            # Run once everything is complete.
+            for response in await asyncio.gather(*tasks):
+                inputJson = response
+                treeWordsArr = funcExtractTextArrFromJson(inputJson)
+                treeTextContentsArr += treeWordsArr
+                pass
+    treeTextContentsArr = list(set(treeTextContentsArr))
+    print(treeTextContentsArr)
+    return treeTextContentsArr
+
+def extractJsTreeTermsWordsArr(inputJson):
+    jsonObj = json.loads(inputJson)
+    resultsArr = []
+    for item in jsonObj:
+        result = item.get("text")
+        if (type(result) == str) & (result not in resultsArr):
+            resultsArr.append(result)
+    return resultsArr
+
+def extractChildTermsWordsArr(inputJson):
+    jsonObj = json.loads(inputJson)
+    resultsArr = []
+    if "_embedded" in jsonObj:
+        if "terms" in jsonObj.get("_embedded"):
+            jsonObjTerms = jsonObj.get("_embedded").get("terms")
+            for item in jsonObjTerms:
+                result = item.get("label")
+                if (type(result) == str) & (result not in resultsArr):
+                    resultsArr.append(result)
+    return resultsArr
 
 def writeAllJsTree(term):
     # TODO
     return None
 
-def writeTextToFile(outputFileName, text):
-    # TODO
-    with open(outputFileName, 'w') as f:
-        f.write(text)
+def writeArrayToFile(outputFileName, valsArray):
+    with open(outputFileName, 'wt') as f:
+        tsv_writer = csv.writer(f, delimiter='\t')
+        for val in valsArray:
+            tsv_writer.writerow([val])
     return None
 
 
@@ -146,6 +196,39 @@ def main(argv):
         loop = asyncio.get_event_loop()
         future = asyncio.ensure_future(start_async_process())
         loop.run_until_complete(future)
+
+    savedJsTreeUrlsArr = []
+    savedChildrenUrlsArr = []
+
+    with open(FILENAME_JSTREE_URLS) as j_in_file, open(FILENAME_CHILDREN_URLS) as c_in_file:
+        tsv_file_j = csv.reader(j_in_file, delimiter='\t')
+        tsv_file_c = csv.reader(c_in_file, delimiter='\t')
+        for line in tsv_file_j:
+            print(line)
+            savedJsTreeUrlsArr.append(line)
+        for line in tsv_file_c:
+            print(line)
+            savedChildrenUrlsArr.append(line)
+
+    #jstree_urls_df = pd.read_csv(FILENAME_JSTREE_URLS, sep='\t')
+    #children_urls_df = pd.read_csv(FILENAME_CHILDREN_URLS sep='\t')
+
+    treesContentsArray = []
+
+    jsTreeContentsArr = []
+    loop2 = asyncio.get_event_loop()
+    future2 = asyncio.ensure_future(start_async_process_tree_contents(savedJsTreeUrlsArr, extractJsTreeTermsWordsArr, jsTreeContentsArr))
+    loop2.run_until_complete(future2)
+
+    childTreeContentsArr = []
+    loop3 = asyncio.get_event_loop()
+    future3 = asyncio.ensure_future(start_async_process_tree_contents(savedChildrenUrlsArr, extractChildTermsWordsArr, childTreeContentsArr))
+    loop3.run_until_complete(future3)
+
+    treesContentsArray += jsTreeContentsArr
+    treesContentsArray += childTreeContentsArr
+    treesContentsArray = list(set(treesContentsArray))
+    writeArrayToFile(FILENAME_TREES_CONTENTS_TSV, treesContentsArray)
 
     print("Done.")
 
