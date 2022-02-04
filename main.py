@@ -4,6 +4,8 @@ import json
 import pprint
 import time
 import csv
+import sys
+import getopt
 
 # generate random integer values
 from random import seed
@@ -22,6 +24,9 @@ from timeit import default_timer
 
 START_TIME = default_timer()
 seed(1)
+
+FILENAME_JSTREE_URLS = "js_tree_urls_output.tsv"
+FILENAME_CHILDREN_URLS = "children_urls_output.tsv"
 
 def request(session, url, identifyingVal):
     # URL for API request to obtain the metadata based upon a study.
@@ -74,7 +79,7 @@ async def start_async_process():
             # Run once everything is complete.
             for response in await asyncio.gather(*tasks):
                 inputJson = response
-                with open('js_tree_urls_output.tsv', 'wt') as j_out_file, open('children_urls_output.tsv', 'wt') as c_out_file:
+                with open(FILENAME_JSTREE_URLS, 'wt') as j_out_file, open(FILENAME_CHILDREN_URLS, 'wt') as c_out_file:
                     tsv_writer_j = csv.writer(j_out_file, delimiter='\t')
                     tsv_writer_c = csv.writer(c_out_file, delimiter='\t')
                     buildTermApiUrlsArrays(inputJson, jsTreeUrlsArray, childrenUrlsArray, tsv_writer_j, tsv_writer_c)
@@ -119,12 +124,34 @@ def buildTermApiUrlsArrays(inputJson, jsTreeUrlsArray, childrenUrlsArray, tsvWri
                             childrenUrlsArray.append(childrenUrl)
                             tsvWriterChildren.writerow([childrenUrl])
 
+def main(argv):
+    print(sys.argv)
+
+    writeUrls = True
+    try:
+        opts, args = getopt.getopt(argv, "u:", ["gatherUrls="])
+    except getopt.GetoptError:
+        print
+        'main.py -u <writeUrls>'
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ("-u", "--gatherUrls"):
+            if arg == "N":
+                writeUrls = False
+
+    print
+    'Write urls? "', writeUrls
+
+    if writeUrls:
+        loop = asyncio.get_event_loop()
+        future = asyncio.ensure_future(start_async_process())
+        loop.run_until_complete(future)
+
+    print("Done.")
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    future = asyncio.ensure_future(start_async_process())
-    loop.run_until_complete(future)
+    main(sys.argv[1:])
 
 # # https://www.ebi.ac.uk/ols/ontologies/mondo/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FMONDO_0005812
 # URL = "https://www.geeksforgeeks.org/data-structures/"
