@@ -88,7 +88,7 @@ async def start_async_process():
                 pass
 
 async def start_async_process_tree_contents(urlsArray, funcExtractTextArrFromJson, treeTextContentsArr):
-    urlsArray = urlsArray[0:5]
+    # urlsArray = urlsArray[0:5]
     # treeTextContentsArr = []
     with ThreadPoolExecutor(max_workers=100) as executor:
         with requests.Session() as session:
