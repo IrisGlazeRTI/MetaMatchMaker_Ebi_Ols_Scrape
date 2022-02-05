@@ -11,6 +11,7 @@ import getopt
 # generate random integer values
 from random import seed
 from random import randint
+import random
 
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
@@ -57,15 +58,23 @@ def getPaginatedTermsJson(session, pageNum):
         data = getPaginatedTermsJson(session, pageNum)
     return data
 
+def createRandNumsArray(min, max, size, excludeArray = []):
+    resultArray = []
+    if (max - min + 1) >= size:
+        rangeArray = list(range(min, max+1))
+        for x in range(size):
+            randVal = random.choice(list(set(rangeArray) - set(resultArray) - set(excludeArray)))
+            resultArray.append(randVal)
+        resultArray.sort()
+    return resultArray
+
 async def start_async_process(jsTreeUrlsArray, childrenUrlsArray):
-    results = []
-    # jsTreeUrlsArray = []
-    # childrenUrlsArray = []
-    # pagesArray = [0, 1, 2]
-    #pagesArray = list(range(0, 4))
-    pagesArray = list(range(0, 7156))
-    pagesArray = pagesArray[0:100]
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    #pagesArray = list(range(0, 7156))
+    #pagesArray = pagesArray[0:100]
+
+    pagesArray = createRandNumsArray(0, 7156, 10)
+    print(pagesArray)
+    with ThreadPoolExecutor(max_workers=100) as executor:
         with requests.Session() as session:
             # asynchronously make an api call for each study
             loop = asyncio.get_event_loop()
@@ -90,12 +99,13 @@ async def start_async_process(jsTreeUrlsArray, childrenUrlsArray):
                 pass
     jsTreeUrlsArray = list(set(jsTreeUrlsArray))
     childrenUrlsArray = list(set(childrenUrlsArray))
+    writeArrayToFile("pages_recorded.tsv", pagesArray)
     return None
 
 async def start_async_process_tree_contents(urlsArray, funcExtractTextArrFromJson, treeTextContentsArr):
     # urlsArray = urlsArray[0:5]
     # treeTextContentsArr = []
-    with ThreadPoolExecutor(max_workers=1000) as executor:
+    with ThreadPoolExecutor(max_workers=100) as executor:
         with requests.Session() as session:
             # asynchronously make an api call for each study
             loop = asyncio.get_event_loop()
@@ -116,7 +126,7 @@ async def start_async_process_tree_contents(urlsArray, funcExtractTextArrFromJso
                 treeTextContentsArr += treeWordsArr
                 pass
     treeTextContentsArr = list(set(treeTextContentsArr))
-    print(treeTextContentsArr)
+    #print(treeTextContentsArr)
     return treeTextContentsArr
 
 def extractJsTreeTermsWordsArr(inputJson):
@@ -232,10 +242,10 @@ def main(argv):
         tsv_file_j = csv.reader(j_in_file, delimiter='\t')
         tsv_file_c = csv.reader(c_in_file, delimiter='\t')
         for line in tsv_file_j:
-            print(line)
+            #print(line)
             savedJsTreeUrlsArr.append(line)
         for line in tsv_file_c:
-            print(line)
+            #print(line)
             savedChildrenUrlsArr.append(line)
 
     #jstree_urls_df = pd.read_csv(FILENAME_JSTREE_URLS, sep='\t')
